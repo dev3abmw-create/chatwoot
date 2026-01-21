@@ -14,6 +14,15 @@ const { context } = defineProps({
   },
 });
 
+// Get props from context attrs (FormKit passes them this way)
+const allowedCountries = computed(() => {
+  return context.allowedCountries || [];
+});
+
+const phoneMask = computed(() => {
+  return context.phoneMask || '';
+});
+
 const localValue = ref(context.value || '');
 
 const selectedIndex = ref(-1);
@@ -25,21 +34,38 @@ const phoneNumber = ref('');
 
 const dropdownRef = useTemplateRef('dropdownRef');
 const searchbarRef = useTemplateRef('searchbarRef');
+const inputRef = useTemplateRef('inputRef');
 
 const placeholder = computed(() => context?.attrs?.placeholder || '');
 const hasErrorInPhoneInput = computed(() => context?.state?.invalid);
 const dropdownFirstItemName = computed(() =>
   activeCountryCode.value ? 'Clear selection' : 'Select Country'
 );
-const countries = computed(() => [
-  {
-    name: dropdownFirstItemName.value,
-    dial_code: '',
-    emoji: '',
-    id: '',
-  },
-  ...countriesList,
-]);
+const countries = computed(() => {
+  let filteredCountries = countriesList;
+  
+  // Filter by allowed countries if provided
+  if (allowedCountries.value && allowedCountries.value.length > 0) {
+    filteredCountries = countriesList.filter(country =>
+      allowedCountries.value.includes(country.id)
+    );
+  }
+  
+  return [
+    {
+      name: dropdownFirstItemName.value,
+      dial_code: '',
+      emoji: '',
+      id: '',
+    },
+    ...filteredCountries,
+  ];
+});
+
+const isSingleCountry = computed(() => {
+  // Check if there's only one selectable country (excluding the first item)
+  return countries.value.length === 2;
+});
 
 const items = computed(() => {
   return countries.value.filter(country => {
@@ -66,17 +92,119 @@ watch(items, newItems => {
   }
 });
 
+// Auto-select country if only one is allowed
+watch(
+  [allowedCountries, isSingleCountry],
+  () => {
+    if (
+      allowedCountries.value &&
+      allowedCountries.value.length > 0 &&
+      countries.value.length === 2
+    ) {
+      const singleCountry = countries.value[1];
+      activeCountryCode.value = singleCountry.id;
+      activeDialCode.value = singleCountry.dial_code;
+      if (context?.node) {
+        setContextValue(singleCountry.dial_code);
+      }
+    }
+  },
+  { immediate: true, deep: true }
+);
+
+function applyMask(value, mask) {
+  if (!mask) return value;
+  
+  // Extract only digits
+  const digits = value.replace(/\D/g, '');
+  const maxDigits = (mask.match(/#/g) || []).length;
+  const limitedDigits = digits.slice(0, maxDigits);
+  
+  let result = '';
+  let digitIndex = 0;
+  
+  // Apply mask format
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i] === '#') {
+      if (digitIndex < limitedDigits.length) {
+        result += limitedDigits[digitIndex];
+        digitIndex++;
+      } else {
+        break;
+      }
+    } else {
+      // Add separator only if we have more digits
+      if (digitIndex < limitedDigits.length) {
+        result += mask[i];
+      }
+    }
+  }
+  
+  return result;
+}
+
+function onKeyPress(e) {
+  // Block non-digit characters
+  const char = e.key;
+  if (!/^\d$/.test(char)) {
+    e.preventDefault();
+  }
+}
+
+function onPaste(e) {
+  // Handle paste - extract only digits
+  e.preventDefault();
+  const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+  const digits = pastedText.replace(/\D/g, '');
+  
+  if (digits) {
+    const currentValue = phoneNumber.value || '';
+    const newValue = currentValue + digits;
+    
+    let maskedValue;
+    if (phoneMask.value) {
+      maskedValue = applyMask(newValue, phoneMask.value);
+    } else {
+      maskedValue = digits;
+    }
+    
+    phoneNumber.value = maskedValue;
+    // Force update the input element
+    if (inputRef.value) {
+      inputRef.value.value = maskedValue;
+    }
+    
+    setContextValue(activeDialCode.value);
+  }
+}
+
 function setContextValue(code) {
   const safeCode = unref(code);
-  // This function is used to set the context value.
-  // The context value is used to set the value of the phone number field in the pre-chat form.
-  localValue.value = `${safeCode}${phoneNumber.value}`;
+  // Extract only digits from phoneNumber for submission
+  const digitsOnly = phoneNumber.value.replace(/\D/g, '');
+  localValue.value = `${safeCode}${digitsOnly}`;
   context.node.input(localValue.value);
 }
 
 function onChange(e) {
-  phoneNumber.value = e.target.value;
-  // This function is used to set the context value when the user types in the phone number field.
+  let value = e.target.value;
+  
+  // Apply mask if provided
+  if (phoneMask.value) {
+    value = applyMask(value, phoneMask.value);
+  } else {
+    // No mask - just filter to digits only
+    value = value.replace(/\D/g, '');
+  }
+  
+  // Update reactive value with masked format (for display)
+  phoneNumber.value = value;
+  // Force update the input element to prevent showing unmasked value
+  if (inputRef.value && e.target.value !== value) {
+    e.target.value = value;
+  }
+  
+  // setContextValue will extract digits only for form submission
   setContextValue(activeDialCode.value);
 }
 
@@ -146,6 +274,9 @@ function onSelectCountry(country) {
 }
 
 function toggleCountryDropdown() {
+  // Don't allow opening dropdown if only one country is available
+  if (isSingleCountry.value) return;
+  
   showDropdown.value = !showDropdown.value;
   selectedIndex.value = -1;
   if (showDropdown.value) {
@@ -174,14 +305,22 @@ function onSelect() {
       }"
     >
       <div
-        class="flex items-center justify-between h-[2.625rem] px-2 py-2 cursor-pointer bg-n-alpha-1 dark:bg-n-solid-1 ltr:rounded-bl-lg rtl:rounded-br-lg ltr:rounded-tl-lg rtl:rounded-tr-lg min-w-[3.6rem] w-[3.6rem]"
+        class="flex items-center justify-between h-[2.625rem] px-2 py-2 bg-n-alpha-1 dark:bg-n-solid-1 ltr:rounded-bl-lg rtl:rounded-br-lg ltr:rounded-tl-lg rtl:rounded-tr-lg min-w-[3.6rem] w-[3.6rem]"
+        :class="{
+          'cursor-pointer': !isSingleCountry,
+        }"
         @click="toggleCountryDropdown"
       >
         <h5 v-if="activeCountry.emoji" class="mb-0 text-xl">
           {{ activeCountry.emoji }}
         </h5>
         <FluentIcon v-else icon="globe" class="fluent-icon" size="20" />
-        <FluentIcon icon="chevron-down" class="fluent-icon" size="12" />
+        <FluentIcon
+          v-if="!isSingleCountry"
+          icon="chevron-down"
+          class="fluent-icon"
+          size="12"
+        />
       </div>
       <span
         v-if="activeDialCode"
@@ -190,12 +329,16 @@ function onSelect() {
         {{ activeDialCode }}
       </span>
       <input
+        ref="inputRef"
         :value="phoneNumber"
-        type="phoneInput"
+        type="tel"
+        inputmode="numeric"
         class="w-full h-full !py-3 pl-2 pr-3 leading-tight rounded-r !outline-none focus:!ring-0 !bg-transparent dark:!bg-transparent"
         name="phoneNumber"
         :placeholder="placeholder"
         @input="onChange"
+        @keypress="onKeyPress"
+        @paste="onPaste"
         @blur="context.blurHandler"
       />
     </div>

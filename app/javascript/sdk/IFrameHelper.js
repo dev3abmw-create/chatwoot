@@ -52,6 +52,11 @@ const updateCampaignReadStatus = baseDomain => {
 
 export const IFrameHelper = {
   getUrl({ baseUrl, websiteToken }) {
+    // Use custom widget URL if provided in settings, otherwise use baseUrl
+    const customWidgetUrl = window.chatwootSettings?.widgetUrl;
+    if (customWidgetUrl) {
+      return `${customWidgetUrl}?website_token=${websiteToken}`;
+    }
     return `${baseUrl}/widget?website_token=${websiteToken}`;
   },
   createFrame: ({ baseUrl, websiteToken }) => {
