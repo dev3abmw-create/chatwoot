@@ -5,6 +5,7 @@ import { IFrameHelper } from 'widget/helpers/utils';
 import { shouldTriggerMessageUpdateEvent } from './IframeEventHelper';
 import { CHATWOOT_ON_MESSAGE } from '../constants/sdkEvents';
 import { emitter } from '../../shared/helpers/mitt';
+import { WEBSOCKET_BASE_URL } from './constants';
 
 const isMessageInActiveConversation = (getters, message) => {
   const { conversation_id: conversationId } = message;
@@ -15,7 +16,7 @@ const isMessageInActiveConversation = (getters, message) => {
 
 class ActionCableConnector extends BaseActionCableConnector {
   constructor(app, pubsubToken) {
-    super(app, pubsubToken);
+    super(app, pubsubToken, WEBSOCKET_BASE_URL);
     this.events = {
       'message.created': this.onMessageCreated,
       'message.updated': this.onMessageUpdated,

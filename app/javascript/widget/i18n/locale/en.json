@@ -95,6 +95,11 @@
     "REQUIRED": "Required",
     "REGEX_ERROR": "Please provide a valid input"
   },
+  "SOCIAL_BUTTONS": {
+    "CONTACT_VIA": "or contact us via",
+    "TELEGRAM": "TELEGRAM",
+    "WHATSAPP": "WHATSAPP"
+  },
   "FILE_SIZE_LIMIT": "File exceeds the {MAXIMUM_FILE_UPLOAD_SIZE} attachment limit",
   "CHAT_FORM": {
     "INVALID": {

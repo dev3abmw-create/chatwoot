@@ -26,7 +26,7 @@ export default {
   emits: ['submitPreChat'],
   setup() {
     const phoneInput = createInput(PhoneInput, {
-      props: ['hasErrorInPhoneInput'],
+      props: ['hasErrorInPhoneInput', 'allowedCountries', 'phoneMask'],
     });
     const { formatMessage } = useMessageFormatter();
 
@@ -106,13 +106,23 @@ export default {
     enabledPreChatFields() {
       return this.filteredPreChatFields
         .filter(field => field.enabled)
-        .map(field => ({
-          ...field,
-          type:
-            field.name === 'phoneNumber'
-              ? this.phoneInput
-              : this.findFieldType(field.type),
-        }));
+        .map(field => {
+          const mappedField = {
+            ...field,
+            type:
+              field.name === 'phoneNumber'
+                ? this.phoneInput
+                : this.findFieldType(field.type),
+          };
+          
+          // Add phone-specific props
+          if (field.name === 'phoneNumber') {
+            mappedField.allowed_countries = field.allowed_countries || this.allowedCountries;
+            mappedField.phone_mask = field.phone_mask || '(###) ###-####';
+          }
+          
+          return mappedField;
+        });
     },
     conversationCustomAttributes() {
       let conversationAttributes = {};
@@ -137,6 +147,9 @@ export default {
         }
       });
       return contactAttributes;
+    },
+    allowedCountries() {
+      return ['RU'];
     },
   },
   methods: {
@@ -177,6 +190,7 @@ export default {
     },
     getValidation({ type, name, field_type, regex_pattern }) {
       let regex = regex_pattern ? getRegexp(regex_pattern) : null;
+      
       const validations = {
         emailAddress: 'email',
         phoneNumber: ['startsWithPlus', 'isValidPhoneNumber'],
@@ -198,12 +212,39 @@ export default {
         validationKeys.includes(type) ||
         validationKeys.includes(field_type)
       ) {
-        const validationType =
+        let validationType =
           validations[type] || validations[name] || validations[field_type];
+        
+        // Add regex validation for phoneNumber if regex_pattern is provided
+        if (name === 'phoneNumber' && regex_pattern && validationType) {
+          // Convert to array if it's not already
+          const validationArray = Array.isArray(validationType)
+            ? [...validationType]
+            : [validationType];
+          // Use the regex pattern string, not the compiled RegExp object
+          validationArray.push(['matches', regex]);
+          validationType = validationArray;
+        }
+        
         const allValidations = validationType
           ? validation.concat(validationType)
           : validation;
-        return allValidations.join('|');
+        
+        // Flatten nested arrays and join with |
+        const flattened = allValidations.map(v => {
+          if (Array.isArray(v)) {
+            // For matches validation, format as matches:/pattern/
+            if (v[0] === 'matches' && v[1] instanceof RegExp) {
+              const pattern = v[1].source;
+              const flags = v[1].flags;
+              return `matches:/${pattern}/${flags}`;
+            }
+            return v.join(':');
+          }
+          return v;
+        });
+        
+        return flattened.join('|');
       }
 
       return '';
@@ -237,7 +278,7 @@ export default {
         fullName,
         phoneNumber,
         emailAddress,
-        message,
+        message: message || '',
         activeCampaignId: this.activeCampaign.id,
         conversationCustomAttributes: this.conversationCustomAttributes,
         contactCustomAttributes: this.contactCustomAttributes,
@@ -297,19 +338,8 @@ export default {
           : $t('PRE_CHAT_FORM.REGEX_ERROR'),
       }"
       :has-error-in-phone-input="hasErrorInPhoneInput"
-    />
-    <FormKit
-      v-if="!hasActiveCampaign"
-      name="message"
-      type="textarea"
-      :label-class="context => `text-sm font-medium ${labelClass(context)}`"
-      :input-class="context => inputClass(context)"
-      :label="$t('PRE_CHAT_FORM.FIELDS.MESSAGE.LABEL')"
-      :placeholder="$t('PRE_CHAT_FORM.FIELDS.MESSAGE.PLACEHOLDER')"
-      validation="required"
-      :validation-messages="{
-        required: $t('PRE_CHAT_FORM.FIELDS.MESSAGE.ERROR'),
-      }"
+      :allowed-countries="allowedCountries"
+      :phone-mask="'(###) ###-####'"
     />
 
     <CustomButton

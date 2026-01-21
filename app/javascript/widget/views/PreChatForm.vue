@@ -2,6 +2,7 @@
 import { mapActions } from 'vuex';
 import { useRouter } from 'vue-router';
 import PreChatForm from '../components/PreChat/Form.vue';
+import SocialButtons from '../components/SocialButtons.vue';
 import configMixin from '../mixins/configMixin';
 import { isEmptyObject } from 'widget/helpers/utils';
 import { ON_CONVERSATION_CREATED } from '../constants/widgetBusEvents';
@@ -10,6 +11,7 @@ import { emitter } from 'shared/helpers/mitt';
 export default {
   components: {
     PreChatForm,
+    SocialButtons,
   },
   mixins: [configMixin],
   setup() {
@@ -77,7 +79,8 @@ export default {
 </script>
 
 <template>
-  <div class="flex flex-1 overflow-auto">
+  <div class="flex flex-col flex-1 overflow-auto">
     <PreChatForm :options="preChatFormOptions" @submit-pre-chat="onSubmit" />
+    <SocialButtons />
   </div>
 </template>

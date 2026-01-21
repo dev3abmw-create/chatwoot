@@ -1,5 +1,7 @@
 export const APP_BASE_URL = '';
 
+export const WEBSOCKET_BASE_URL = 'https://app.chatwoot.com';
+
 export const MESSAGE_STATUS = {
   FAILED: 'failed',
   SUCCESS: 'success',

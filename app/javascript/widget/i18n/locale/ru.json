@@ -95,6 +95,11 @@
     "REQUIRED": "Обязательно",
     "REGEX_ERROR": "Пожалуйста, предоставьте корректные данные"
   },
+  "SOCIAL_BUTTONS": {
+    "CONTACT_VIA": "или свяжитесь с нами через",
+    "TELEGRAM": "TELEGRAM",
+    "WHATSAPP": "WHATSAPP"
+  },
   "FILE_SIZE_LIMIT": "Превышен размер загружаемого файла - {MAXIMUM_FILE_UPLOAD_SIZE}",
   "CHAT_FORM": {
     "INVALID": {
