@@ -57,7 +57,7 @@ export const createBubbleIcon = ({ className, path, target }) => {
   }
 
   target.className = bubbleClassName;
-  target.title = 'Open chat window';
+  target.title = 'Открыть чат';
   return target;
 };
 
